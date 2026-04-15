@@ -147,51 +147,77 @@ st.markdown("""
         border-bottom: 1px solid #eee;
     }
     
-    /* Mobile header - slides from top */
-    @media (max-width: 768px) {
-        /* Hide default sidebar */
-        div[data-testid="stSidebar"] {
-            background: transparent !important;
-            border: none !important;
+    /* Mobile full-screen sticky drawer */
+    .mobile-input-drawer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100vw;
+        height: 100vh;
+        background: linear-gradient(180deg, #f8f9fc 0%, #e8ecf4 100%);
+        z-index: 999;
+        overflow-y: auto;
+        padding: 1.5rem;
+        padding-top: 3rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        animation: slideIn 0.4s ease-out;
+    }
+
+    .mobile-input-drawer.slide-up {
+        animation: slideUp 0.4s ease-in forwards;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateY(100%);
+            opacity: 0;
         }
-        
-        /* Create sticky header container */
-        .mobile-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: linear-gradient(180deg, #f8f9fc 0%, #e8ecf4 100%);
-            z-index: 1000;
-            width: 100vw;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            animation: slideDown 0.3s ease-out;
-            padding-bottom: 1rem;
-        }
-        
-        @keyframes slideDown {
-            from {
-                transform: translateY(-100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
+        to {
+            transform: translateY(0);
+            opacity: 1;
         }
     }
-    
+
     @keyframes slideUp {
         from {
             transform: translateY(0);
             opacity: 1;
         }
         to {
-            transform: translateY(-100%);
+            transform: translateY(100%);
             opacity: 0;
         }
+    }
+
+    .drawer-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem;
+        z-index: 1000;
+        text-align: center;
+        font-weight: 600;
+    }
+
+    .open-drawer-btn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 998;
+        width: 60px;
+        height: 60px;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 24px;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
         .main-header {
             padding: 1.2rem 1rem;
@@ -359,18 +385,21 @@ if not model_loaded:
 # ──────────────────────── Detect Mobile & Load Dataset ────────────────────────
 df = load_dataset()
 
-# Check if we're on mobile via CSS media query workaround
 # Initialize session state for mobile drawer
-if "show_mobile_drawer" not in st.session_state:
-    st.session_state.show_mobile_drawer = False
+if "mobile_drawer_open" not in st.session_state:
+    st.session_state.mobile_drawer_open = True  # Open by default on load
 
-# ──────────────────────── Mobile Top Drawer or Desktop Sidebar ────────────────────────
-# Create a container for mobile header/drawer
-mobile_drawer_container = st.container()
+# ──────────────────────── Mobile Detection & Controls ────────────────────────
+# Create inputs container for both mobile and desktop
+vehicle_age = None
+vehicle_type = None
+km_run = None
+num_claims = None
+region = None
+predict_btn = False
 
 # Desktop Sidebar (traditional)
 with st.sidebar:
-    # Desktop sidebar content
     st.markdown("## 🎛️ Input Parameters")
     st.markdown("Adjust vehicle details below to get a premium prediction.")
     st.markdown("---")
@@ -381,11 +410,10 @@ with st.sidebar:
         max_value=15.0,
         value=5.0,
         step=0.1,
-        key="desktop_vehicle_age"
     )
 
     vehicle_types = sorted(df["vehicle_type"].dropna().unique().tolist())
-    vehicle_type = st.selectbox("🏎️ Vehicle Type", vehicle_types, index=0, key="desktop_vehicle_type")
+    vehicle_type = st.selectbox("🏎️ Vehicle Type", vehicle_types, index=0)
 
     km_run = st.number_input(
         "📏 Kilometers Run",
@@ -393,7 +421,6 @@ with st.sidebar:
         max_value=200000,
         value=50000,
         step=1000,
-        key="desktop_km_run"
     )
 
     num_claims = st.slider(
@@ -402,128 +429,107 @@ with st.sidebar:
         max_value=10,
         value=1,
         step=1,
-        key="desktop_num_claims"
     )
 
     regions = sorted(df["region"].dropna().unique().tolist())
-    region = st.selectbox("🌍 Region", regions, index=0, key="desktop_region")
+    region = st.selectbox("🌍 Region", regions, index=0)
 
     st.markdown("---")
-    predict_btn = st.button("🔮 Predict Premium", use_container_width=True, type="primary", key="desktop_predict")
+    predict_btn = st.button("🔮 Predict Premium", use_container_width=True, type="primary")
 
-# Mobile drawer - overlay from top
-with mobile_drawer_container:
+# Mobile drawer - fullscreen overlay (appears on load, collapses on predict/scroll)
+if st.session_state.mobile_drawer_open:
+    st.markdown(f"""
+    <div class="drawer-header">
+        📋 Input Parameters
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""<div class="mobile-input-drawer">""", unsafe_allow_html=True)
+    
+    st.markdown("#### Adjust vehicle details to get a premium prediction")
+    st.markdown("---")
+    
+    # Mobile input controls
+    st.markdown("**🚗 Vehicle Age (years)**")
+    vehicle_age_m = st.slider(
+        "Vehicle Age",
+        min_value=0.0,
+        max_value=15.0,
+        value=5.0,
+        step=0.1,
+        key="mobile_vehicle_age",
+        label_visibility="collapsed"
+    )
+
+    st.markdown("**🏎️ Vehicle Type**")
+    vehicle_type_m = st.selectbox("Vehicle Type", vehicle_types, index=0, key="mobile_vehicle_type", label_visibility="collapsed")
+
+    st.markdown("**📏 Kilometers Run**")
+    km_run_m = st.number_input(
+        "Kilometers Run",
+        min_value=0,
+        max_value=200000,
+        value=50000,
+        step=1000,
+        key="mobile_km_run",
+        label_visibility="collapsed"
+    )
+
+    st.markdown("**📋 Number of Claims**")
+    num_claims_m = st.slider(
+        "Number of Claims",
+        min_value=0,
+        max_value=10,
+        value=1,
+        step=1,
+        key="mobile_num_claims",
+        label_visibility="collapsed"
+    )
+
+    st.markdown("**🌍 Region**")
+    region_m = st.selectbox("Region", regions, index=0, key="mobile_region", label_visibility="collapsed")
+
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔮 Predict Premium", use_container_width=True, type="primary", key="mobile_predict"):
+            # Store values for prediction
+            vehicle_age = vehicle_age_m
+            vehicle_type = vehicle_type_m
+            km_run = km_run_m
+            num_claims = num_claims_m
+            region = region_m
+            predict_btn = True
+            # Close drawer after predict
+            st.session_state.mobile_drawer_open = False
+            st.rerun()
+    
+    with col2:
+        if st.button("✕ Close", use_container_width=True, key="close_drawer"):
+            st.session_state.mobile_drawer_open = False
+            st.rerun()
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+else:
+    # Show button to re-open drawer when closed
     st.markdown("""
     <style>
-        .mobile-drawer-btn {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 999;
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 24px;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-        
         @media (max-width: 768px) {
-            .mobile-drawer-btn {
+            .open-drawer-btn {
                 display: flex !important;
             }
         }
-        
         @media (min-width: 769px) {
-            .mobile-drawer-btn {
+            .open-drawer-btn {
                 display: none !important;
             }
         }
     </style>
+    <div class="open-drawer-btn" onclick="location.reload();">
+        ⚙️
+    </div>
     """, unsafe_allow_html=True)
-    
-    # Mobile drawer toggle button
-    col1, col2, col3 = st.columns([1, 1, 0.8])
-    with col3:
-        if st.button("⚙️ Menu", key="mobile_menu_btn", use_container_width=True):
-            st.session_state.show_mobile_drawer = not st.session_state.show_mobile_drawer
-    
-    # Show mobile drawer if toggled
-    if st.session_state.show_mobile_drawer:
-        st.markdown("""
-        <div style="background: linear-gradient(180deg, #f8f9fc 0%, #e8ecf4 100%); padding: 1.5rem; border-radius: 0 0 12px 12px; margin-bottom: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
-        """, unsafe_allow_html=True)
-        
-        col_close = st.columns([1, 6])
-        with col_close[1]:
-            if st.button("✕ Close", use_container_width=True, key="close_drawer"):
-                st.session_state.show_mobile_drawer = False
-        
-        st.markdown("---")
-        
-        # Mobile input controls
-        st.markdown("#### 🚗 Vehicle Age")
-        vehicle_age_m = st.slider(
-            "Years",
-            min_value=0.0,
-            max_value=15.0,
-            value=5.0,
-            step=0.1,
-            key="mobile_vehicle_age"
-        )
-
-        st.markdown("#### 🏎️ Vehicle Type")
-        vehicle_type_m = st.selectbox("Type", vehicle_types, index=0, key="mobile_vehicle_type")
-
-        st.markdown("#### 📏 Kilometers Run")
-        km_run_m = st.number_input(
-            "KM",
-            min_value=0,
-            max_value=200000,
-            value=50000,
-            step=1000,
-            key="mobile_km_run"
-        )
-
-        st.markdown("#### 📋 Number of Claims")
-        num_claims_m = st.slider(
-            "Claims",
-            min_value=0,
-            max_value=10,
-            value=1,
-            step=1,
-            key="mobile_num_claims"
-        )
-
-        st.markdown("#### 🌍 Region")
-        region_m = st.selectbox("Region", regions, index=0, key="mobile_region")
-
-        st.markdown("---")
-        predict_btn_m = st.button("🔮 Predict Premium", use_container_width=True, type="primary", key="mobile_predict")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Use mobile values if drawer is open and predict was clicked, else use desktop
-    if st.session_state.show_mobile_drawer and "mobile_predict" in st.session_state and st.session_state.get("mobile_predict"):
-        final_vehicle_age = vehicle_age_m
-        final_vehicle_type = vehicle_type_m
-        final_km_run = km_run_m
-        final_num_claims = num_claims_m
-        final_region = region_m
-        show_prediction = True
-    elif predict_btn:
-        final_vehicle_age = vehicle_age
-        final_vehicle_type = vehicle_type
-        final_km_run = km_run
-        final_num_claims = num_claims
-        final_region = region
-        show_prediction = True
-    else:
-        show_prediction = False
 
 
 # ──────────────────────── Main Content ────────────────────────
@@ -531,14 +537,14 @@ tab1, tab2, tab3 = st.tabs(["🔮 Prediction", "📊 Model Performance", "📈 D
 
 # ── Tab 1: Prediction ──
 with tab1:
-    if show_prediction:
+    if predict_btn:
         # Create input data with basic features
         input_data = pd.DataFrame([{
-            "vehicle_age_years": final_vehicle_age,
-            "vehicle_type": final_vehicle_type,
-            "no_of_kilometers_run": float(final_km_run),
-            "number_of_claims": float(final_num_claims),
-            "region": final_region,
+            "vehicle_age_years": vehicle_age,
+            "vehicle_type": vehicle_type,
+            "no_of_kilometers_run": float(km_run),
+            "number_of_claims": float(num_claims),
+            "region": region,
         }])
         
         # Apply feature engineering
@@ -568,13 +574,13 @@ with tab1:
             with col1a:
                 st.markdown(f"""
                 <div class="metric-card">
-                    <div class="value">{final_vehicle_age:.1f}</div>
+                    <div class="value">{vehicle_age:.1f}</div>
                     <div class="label">Vehicle Age (yrs)</div>
                 </div>""", unsafe_allow_html=True)
             with col1b:
                 st.markdown(f"""
                 <div class="metric-card">
-                    <div class="value">{final_vehicle_type}</div>
+                    <div class="value">{vehicle_type}</div>
                     <div class="label">Vehicle Type</div>
                 </div>""", unsafe_allow_html=True)
         
@@ -583,23 +589,28 @@ with tab1:
             with col2a:
                 st.markdown(f"""
                 <div class="metric-card">
-                    <div class="value">{final_num_claims}</div>
+                    <div class="value">{num_claims}</div>
                     <div class="label">Claims</div>
                 </div>""", unsafe_allow_html=True)
             with col2b:
                 st.markdown(f"""
                 <div class="metric-card">
-                    <div class="value">{final_region}</div>
+                    <div class="value">{region}</div>
                     <div class="label">Region</div>
                 </div>""", unsafe_allow_html=True)
         
         st.markdown(f"""
         <div class="metric-card">
-            <div class="value">{final_km_run:,}</div>
+            <div class="value">{km_run:,}</div>
             <div class="label">Kilometers Run</div>
         </div>""", unsafe_allow_html=True)
+        
+        # Show button to open menu again on mobile
+        if st.button("← Edit Parameters", use_container_width=True):
+            st.session_state.mobile_drawer_open = True
+            st.rerun()
     else:
-        st.info("👈 Adjust parameters in the sidebar (desktop) or tap ⚙️ Menu (mobile) to make a prediction.")
+        st.info("👈 Adjust parameters in the sidebar (desktop) or use the full-screen menu (mobile) to make a prediction.")
 
 # ── Tab 2: Model Performance ──
 with tab2:
