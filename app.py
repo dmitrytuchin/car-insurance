@@ -18,7 +18,7 @@ st.set_page_config(
     page_title="Insurance Premium Predictor",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",  # Auto collapse on mobile
 )
 
 # ──────────────────────── Custom CSS ────────────────────────
@@ -26,66 +26,84 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+    * {
+        box-sizing: border-box;
+    }
+
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
     }
 
     .main-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 2rem 2.5rem;
-        border-radius: 16px;
+        padding: 1.5rem 1.5rem;
+        border-radius: 12px;
         color: white;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
         box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
     }
+    
     .main-header h1 {
         margin: 0;
-        font-size: 2.2rem;
+        font-size: clamp(1.5rem, 5vw, 2.2rem);
         font-weight: 700;
     }
+    
     .main-header p {
         margin: 0.5rem 0 0 0;
-        font-size: 1.05rem;
+        font-size: clamp(0.9rem, 4vw, 1.05rem);
         opacity: 0.9;
     }
 
     .metric-card {
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        padding: 1.5rem;
+        padding: 1rem;
         border-radius: 12px;
         text-align: center;
         box-shadow: 0 4px 15px rgba(0,0,0,0.08);
         transition: transform 0.2s;
+        min-height: 90px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
+    
     .metric-card:hover {
         transform: translateY(-3px);
     }
+    
     .metric-card .value {
-        font-size: 2rem;
+        font-size: clamp(1.2rem, 4vw, 2rem);
         font-weight: 700;
         color: #667eea;
+        margin: 0;
     }
+    
     .metric-card .label {
-        font-size: 0.9rem;
+        font-size: clamp(0.75rem, 2.5vw, 0.9rem);
         color: #555;
         margin-top: 0.3rem;
+        line-height: 1.2;
     }
 
     .prediction-box {
         background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-        padding: 2rem;
+        padding: 1.5rem;
         border-radius: 16px;
         text-align: center;
         color: white;
         box-shadow: 0 10px 30px rgba(17, 153, 142, 0.3);
         margin: 1.5rem 0;
     }
+    
     .prediction-box .amount {
-        font-size: 3rem;
+        font-size: clamp(2rem, 6vw, 3rem);
         font-weight: 700;
+        margin: 0.5rem 0;
     }
+    
     .prediction-box .subtitle {
-        font-size: 1.1rem;
+        font-size: clamp(0.9rem, 3vw, 1.1rem);
         opacity: 0.9;
     }
 
@@ -101,9 +119,9 @@ st.markdown("""
         display: inline-block;
         background: linear-gradient(135deg, #667eea, #764ba2);
         color: white;
-        padding: 0.3rem 1rem;
+        padding: 0.4rem 0.8rem;
         border-radius: 20px;
-        font-size: 0.85rem;
+        font-size: clamp(0.7rem, 2vw, 0.85rem);
         font-weight: 600;
     }
 
@@ -114,19 +132,81 @@ st.markdown("""
         border-radius: 12px;
         overflow: hidden;
         box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        font-size: clamp(0.75rem, 2vw, 0.95rem);
     }
+    
     .comparison-table th {
         background: linear-gradient(135deg, #667eea, #764ba2);
         color: white;
-        padding: 12px 16px;
+        padding: clamp(8px, 2vw, 12px) clamp(8px, 2vw, 16px);
         font-weight: 600;
     }
+    
     .comparison-table td {
-        padding: 10px 16px;
+        padding: clamp(6px, 1.5vw, 10px) clamp(6px, 1.5vw, 16px);
         border-bottom: 1px solid #eee;
     }
+    
     .comparison-table tr:nth-child(even) td {
         background: #f8f9fc;
+    }
+
+    /* Mobile-specific adjustments */
+    @media (max-width: 768px) {
+        .main-header {
+            padding: 1.2rem 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .metric-card {
+            padding: 0.8rem;
+            min-height: 80px;
+        }
+        
+        .prediction-box {
+            padding: 1.2rem 1rem;
+            margin: 1rem 0;
+        }
+        
+        /* Make dataframe and tables scrollable */
+        .streamlit-expanderHeader {
+            font-size: 0.95rem !important;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .main-header h1 {
+            font-size: 1.3rem;
+        }
+        
+        .main-header p {
+            font-size: 0.85rem;
+        }
+        
+        .metric-card {
+            padding: 0.6rem;
+            min-height: 70px;
+        }
+        
+        .metric-card .value {
+            font-size: 1.1rem;
+        }
+        
+        .metric-card .label {
+            font-size: 0.7rem;
+        }
+        
+        .prediction-box {
+            padding: 1rem;
+        }
+        
+        .prediction-box .amount {
+            font-size: 1.8rem;
+        }
+        
+        .prediction-box .subtitle {
+            font-size: 0.9rem;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -312,37 +392,44 @@ with tab1:
         """, unsafe_allow_html=True)
 
         st.markdown("### 📝 Input Summary")
-        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        # Mobile-responsive layout
+        col1, col2 = st.columns(2)
         with col1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="value">{vehicle_age}</div>
-                <div class="label">Vehicle Age (yrs)</div>
-            </div>""", unsafe_allow_html=True)
+            col1a, col1b = st.columns(2)
+            with col1a:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="value">{vehicle_age:.1f}</div>
+                    <div class="label">Vehicle Age (yrs)</div>
+                </div>""", unsafe_allow_html=True)
+            with col1b:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="value">{vehicle_type}</div>
+                    <div class="label">Vehicle Type</div>
+                </div>""", unsafe_allow_html=True)
+        
         with col2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="value">{vehicle_type}</div>
-                <div class="label">Vehicle Type</div>
-            </div>""", unsafe_allow_html=True)
-        with col3:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="value">{km_run:,}</div>
-                <div class="label">Km Run</div>
-            </div>""", unsafe_allow_html=True)
-        with col4:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="value">{num_claims}</div>
-                <div class="label">Claims</div>
-            </div>""", unsafe_allow_html=True)
-        with col5:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="value">{region}</div>
-                <div class="label">Region</div>
-            </div>""", unsafe_allow_html=True)
+            col2a, col2b = st.columns(2)
+            with col2a:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="value">{num_claims}</div>
+                    <div class="label">Claims</div>
+                </div>""", unsafe_allow_html=True)
+            with col2b:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="value">{region}</div>
+                    <div class="label">Region</div>
+                </div>""", unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="value">{km_run:,}</div>
+            <div class="label">Kilometers Run</div>
+        </div>""", unsafe_allow_html=True)
     else:
         st.info("👈 Adjust parameters in the sidebar and click **Predict Premium** to see results.")
 
@@ -350,6 +437,7 @@ with tab1:
 with tab2:
     st.markdown(f'### Best Model: <span class="model-badge">{best_name}</span>', unsafe_allow_html=True)
 
+    # Responsive metric cards for mobile
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"""
@@ -363,7 +451,7 @@ with tab2:
         st.markdown(f"""
         <div class="metric-card">
             <div class="value">{best_r2:.4f}</div>
-            <div class="label">Test R2</div>
+            <div class="label">Test R²</div>
         </div>""", unsafe_allow_html=True)
 
     st.markdown("")
@@ -389,7 +477,8 @@ with tab3:
     df = load_dataset()
 
     st.markdown("### 📋 Dataset Overview")
-    col1, col2, col3 = st.columns(3)
+    # Mobile-responsive columns
+    col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"""
         <div class="metric-card">
@@ -402,13 +491,13 @@ with tab3:
             <div class="value">{df.shape[1]}</div>
             <div class="label">Features</div>
         </div>""", unsafe_allow_html=True)
-    with col3:
-        missing_pct = (df.isnull().sum().sum() / (df.shape[0] * df.shape[1])) * 100
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="value">{missing_pct:.1f}%</div>
-            <div class="label">Missing Values</div>
-        </div>""", unsafe_allow_html=True)
+    
+    missing_pct = (df.isnull().sum().sum() / (df.shape[0] * df.shape[1])) * 100
+    st.markdown(f"""
+    <div class="metric-card">
+        <div class="value">{missing_pct:.1f}%</div>
+        <div class="label">Missing Values</div>
+    </div>""", unsafe_allow_html=True)
 
     st.markdown("")
     st.markdown("### 📊 Target Distribution")
