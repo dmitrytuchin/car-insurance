@@ -182,6 +182,25 @@ def load_dataset():
     return pd.read_csv(csv_path)
 
 
+def create_feature_interactions(X: pd.DataFrame, numerical_cols: list) -> pd.DataFrame:
+    """Create polynomial and interaction features for numerical columns."""
+    X_enhanced = X.copy()
+    
+    # Create polynomial features for key numerical cols
+    for col in numerical_cols[:3]:  # Top 3 numerical features
+        if col in X_enhanced.columns:
+            X_enhanced[f"{col}_squared"] = X_enhanced[col] ** 2
+            X_enhanced[f"{col}_sqrt"] = np.sqrt(np.abs(X_enhanced[col]))
+    
+    # Create interaction terms
+    if len(numerical_cols) >= 2:
+        col1, col2 = numerical_cols[0], numerical_cols[1]
+        if col1 in X_enhanced.columns and col2 in X_enhanced.columns:
+            X_enhanced[f"{col1}_x_{col2}"] = X_enhanced[col1] * X_enhanced[col2]
+    
+    return X_enhanced
+
+
 try:
     artifact = load_model()
     model = artifact["model"]
@@ -265,6 +284,7 @@ tab1, tab2, tab3 = st.tabs(["🔮 Prediction", "📊 Model Performance", "📈 D
 # ── Tab 1: Prediction ──
 with tab1:
     if predict_btn:
+        # Create input data with basic features
         input_data = pd.DataFrame([{
             "vehicle_age_years": vehicle_age,
             "vehicle_type": vehicle_type,
@@ -272,8 +292,17 @@ with tab1:
             "number_of_claims": float(num_claims),
             "region": region,
         }])
-
-        prediction = model.predict(input_data)[0]
+        
+        # Apply feature engineering
+        numerical_cols_basic = ["vehicle_age_years", "no_of_kilometers_run", "number_of_claims"]
+        input_data_enhanced = create_feature_interactions(input_data, numerical_cols_basic)
+        
+        try:
+            prediction = model.predict(input_data_enhanced)[0]
+        except Exception as e:
+            st.error(f"Prediction error: {str(e)}")
+            st.info("Try refreshing the page or check the logs for details.")
+            st.stop()
 
         st.markdown(f"""
         <div class="prediction-box">
