@@ -384,18 +384,20 @@ if not model_loaded:
 
 # ──────────────────────── Detect Mobile & Load Dataset ────────────────────────
 df = load_dataset()
+vehicle_types = sorted(df["vehicle_type"].dropna().unique().tolist())
+regions = sorted(df["region"].dropna().unique().tolist())
 
 # Initialize session state for mobile drawer
 if "mobile_drawer_open" not in st.session_state:
     st.session_state.mobile_drawer_open = True  # Open by default on load
 
 # ──────────────────────── Mobile Detection & Controls ────────────────────────
-# Create inputs container for both mobile and desktop
-vehicle_age = None
-vehicle_type = None
-km_run = None
-num_claims = None
-region = None
+# Initialize variables
+vehicle_age = 5.0
+vehicle_type = vehicle_types[0] if vehicle_types else "SUV"
+km_run = 50000
+num_claims = 1
+region = regions[0] if regions else "Urban"
 predict_btn = False
 
 # Desktop Sidebar (traditional)
@@ -412,7 +414,6 @@ with st.sidebar:
         step=0.1,
     )
 
-    vehicle_types = sorted(df["vehicle_type"].dropna().unique().tolist())
     vehicle_type = st.selectbox("🏎️ Vehicle Type", vehicle_types, index=0)
 
     km_run = st.number_input(
@@ -431,29 +432,43 @@ with st.sidebar:
         step=1,
     )
 
-    regions = sorted(df["region"].dropna().unique().tolist())
     region = st.selectbox("🌍 Region", regions, index=0)
 
     st.markdown("---")
     predict_btn = st.button("🔮 Predict Premium", use_container_width=True, type="primary")
 
-# Mobile drawer - fullscreen overlay (appears on load, collapses on predict/scroll)
+# Mobile drawer - fullscreen overlay (appears on load, collapses on predict)
 if st.session_state.mobile_drawer_open:
-    st.markdown(f"""
-    <div class="drawer-header">
-        📋 Input Parameters
-    </div>
+    st.markdown("""
+    <style>
+        .mobile-drawer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, #f8f9fc 0%, #e8ecf4 100%);
+            z-index: 999;
+            overflow-y: auto;
+            padding: 1rem;
+            animation: slideIn 0.4s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+    </style>
+    <div class="mobile-drawer-overlay">
     """, unsafe_allow_html=True)
     
-    st.markdown("""<div class="mobile-input-drawer">""", unsafe_allow_html=True)
-    
-    st.markdown("#### Adjust vehicle details to get a premium prediction")
+    st.markdown("### 📋 Input Parameters")
+    st.markdown("Adjust vehicle details to get a premium prediction")
     st.markdown("---")
     
     # Mobile input controls
     st.markdown("**🚗 Vehicle Age (years)**")
     vehicle_age_m = st.slider(
-        "Vehicle Age",
+        "Years",
         min_value=0.0,
         max_value=15.0,
         value=5.0,
@@ -463,11 +478,11 @@ if st.session_state.mobile_drawer_open:
     )
 
     st.markdown("**🏎️ Vehicle Type**")
-    vehicle_type_m = st.selectbox("Vehicle Type", vehicle_types, index=0, key="mobile_vehicle_type", label_visibility="collapsed")
+    vehicle_type_m = st.selectbox("Type", vehicle_types, index=0, key="mobile_vehicle_type", label_visibility="collapsed")
 
     st.markdown("**📏 Kilometers Run**")
     km_run_m = st.number_input(
-        "Kilometers Run",
+        "KM",
         min_value=0,
         max_value=200000,
         value=50000,
@@ -478,7 +493,7 @@ if st.session_state.mobile_drawer_open:
 
     st.markdown("**📋 Number of Claims**")
     num_claims_m = st.slider(
-        "Number of Claims",
+        "Claims",
         min_value=0,
         max_value=10,
         value=1,
@@ -493,16 +508,15 @@ if st.session_state.mobile_drawer_open:
     st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔮 Predict Premium", use_container_width=True, type="primary", key="mobile_predict"):
-            # Store values for prediction
-            vehicle_age = vehicle_age_m
-            vehicle_type = vehicle_type_m
-            km_run = km_run_m
-            num_claims = num_claims_m
-            region = region_m
-            predict_btn = True
-            # Close drawer after predict
+        if st.button("🔮 Predict", use_container_width=True, type="primary", key="mobile_predict"):
+            # Store values for prediction and close drawer
+            st.session_state.vehicle_age = vehicle_age_m
+            st.session_state.vehicle_type = vehicle_type_m
+            st.session_state.km_run = km_run_m
+            st.session_state.num_claims = num_claims_m
+            st.session_state.region = region_m
             st.session_state.mobile_drawer_open = False
+            st.session_state.show_prediction = True
             st.rerun()
     
     with col2:
@@ -511,25 +525,15 @@ if st.session_state.mobile_drawer_open:
             st.rerun()
     
     st.markdown("</div>", unsafe_allow_html=True)
-else:
-    # Show button to re-open drawer when closed
-    st.markdown("""
-    <style>
-        @media (max-width: 768px) {
-            .open-drawer-btn {
-                display: flex !important;
-            }
-        }
-        @media (min-width: 769px) {
-            .open-drawer-btn {
-                display: none !important;
-            }
-        }
-    </style>
-    <div class="open-drawer-btn" onclick="location.reload();">
-        ⚙️
-    </div>
-    """, unsafe_allow_html=True)
+
+# Check if we should use mobile values
+if hasattr(st.session_state, 'show_prediction') and st.session_state.show_prediction:
+    vehicle_age = st.session_state.vehicle_age
+    vehicle_type = st.session_state.vehicle_type
+    km_run = st.session_state.km_run
+    num_claims = st.session_state.num_claims
+    region = st.session_state.region
+    predict_btn = True
 
 
 # ──────────────────────── Main Content ────────────────────────
@@ -606,9 +610,12 @@ with tab1:
         </div>""", unsafe_allow_html=True)
         
         # Show button to open menu again on mobile
-        if st.button("← Edit Parameters", use_container_width=True):
-            st.session_state.mobile_drawer_open = True
-            st.rerun()
+        col_edit = st.columns(1)
+        with col_edit[0]:
+            if st.button("← Edit Parameters", use_container_width=True, key="edit_params"):
+                st.session_state.mobile_drawer_open = True
+                st.session_state.show_prediction = False
+                st.rerun()
     else:
         st.info("👈 Adjust parameters in the sidebar (desktop) or use the full-screen menu (mobile) to make a prediction.")
 
