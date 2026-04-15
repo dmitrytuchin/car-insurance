@@ -2,6 +2,7 @@
 Streamlit app for Insurance Premium Prediction.
 Loads a trained model and allows users to input features for prediction.
 Also shows model performance metrics and dataset insights.
+Auto-trains the model if it doesn't exist.
 """
 
 import streamlit as st
@@ -9,6 +10,8 @@ import pandas as pd
 import numpy as np
 import joblib
 import os
+import subprocess
+import sys
 
 # ──────────────────────── Page Config ────────────────────────
 st.set_page_config(
@@ -131,8 +134,42 @@ st.markdown("""
 
 # ──────────────────────── Load Model ────────────────────────
 @st.cache_resource
-def load_model():
+def train_model_if_needed():
+    """Train the model if it doesn't exist."""
     model_path = os.path.join(os.path.dirname(__file__), "model.pkl")
+    
+    if not os.path.exists(model_path):
+        st.info("🚀 Training model for the first time... This may take a minute.")
+        
+        # Get the directory where this script is located
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+        train_script = os.path.join(app_dir, "train_model.py")
+        
+        # Run the training script
+        try:
+            result = subprocess.run(
+                [sys.executable, train_script],
+                cwd=app_dir,
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+            if result.returncode != 0:
+                st.error(f"Training failed: {result.stderr}")
+                return None
+            st.success("✅ Model trained successfully!")
+        except Exception as e:
+            st.error(f"Error training model: {str(e)}")
+            return None
+    
+    return model_path
+
+
+@st.cache_resource
+def load_model():
+    model_path = train_model_if_needed()
+    if model_path is None or not os.path.exists(model_path):
+        return None
     return joblib.load(model_path)
 
 
